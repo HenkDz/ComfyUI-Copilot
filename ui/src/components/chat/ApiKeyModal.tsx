@@ -41,6 +41,10 @@ export function ApiKeyModal({ isOpen, onClose, onSave, initialApiKey = '', onCon
     const { countDown, start } = useCountDown(60);
     const [loading, setLoading] = useState(false);
     
+    // Provider selection state
+    const [provider, setProvider] = useState<'openai' | 'lmstudio' | 'custom'>('openai');
+    const [customModelName, setCustomModelName] = useState('');
+    
     // OpenAI configuration
     const [openaiApiKey, setOpenaiApiKey] = useState('');
     const [openaiBaseUrl, setOpenaiBaseUrl] = useState('https://api.openai.com/v1');
@@ -52,16 +56,20 @@ export function ApiKeyModal({ isOpen, onClose, onSave, initialApiKey = '', onCon
     useEffect(() => {
         setApiKey(initialApiKey);
         
-        // Load OpenAI configuration from localStorage
-        const savedOpenaiApiKey = localStorage.getItem('openaiApiKey');
-        const savedOpenaiBaseUrl = localStorage.getItem('openaiBaseUrl');
+        // Load saved configuration from localStorage
+        const savedProvider = localStorage.getItem('llmProvider') as 'openai' | 'lmstudio' | 'custom' || 'openai';
+        const savedOpenaiApiKey = localStorage.getItem('openaiApiKey') || '';
+        const savedOpenaiBaseUrl = localStorage.getItem('openaiBaseUrl') || 'https://api.openai.com/v1';
+        const savedCustomModelName = localStorage.getItem('customModelName') || '';
         
-        if (savedOpenaiApiKey) {
-            setOpenaiApiKey(savedOpenaiApiKey);
-        }
+        setProvider(savedProvider);
+        setOpenaiApiKey(savedOpenaiApiKey);
+        setOpenaiBaseUrl(savedOpenaiBaseUrl);
+        setCustomModelName(savedCustomModelName);
         
-        if (savedOpenaiBaseUrl) {
-            setOpenaiBaseUrl(savedOpenaiBaseUrl);
+        // Auto-set URL based on provider if it's still default
+        if (savedProvider === 'lmstudio' && savedOpenaiBaseUrl === 'https://api.openai.com/v1') {
+            setOpenaiBaseUrl('http://localhost:1234/v1');
         }
         
         // Fetch RSA public key
@@ -82,6 +90,21 @@ export function ApiKeyModal({ isOpen, onClose, onSave, initialApiKey = '', onCon
         
         fetchPublicKey();
     }, [initialApiKey]);
+
+    const handleProviderChange = (newProvider: 'openai' | 'lmstudio' | 'custom') => {
+        setProvider(newProvider);
+        
+        // Auto-configure based on provider selection
+        if (newProvider === 'openai') {
+            setOpenaiBaseUrl('https://api.openai.com/v1');
+        } else if (newProvider === 'lmstudio') {
+            setOpenaiBaseUrl('http://localhost:1234/v1');
+            setOpenaiApiKey(''); // LMStudio typically doesn't need API key
+        }
+        
+        // Clear verification result when changing provider
+        setVerificationResult(null);
+    };
 
     const handleVerifyOpenAiKey = async () => {
         // Check if it looks like LMStudio URL
@@ -167,23 +190,26 @@ export function ApiKeyModal({ isOpen, onClose, onSave, initialApiKey = '', onCon
         // Save the main API key
         onSave(apiKey);
         
-        // Check if OpenAI configuration has changed
+        // Check if configuration has changed
+        const previousProvider = localStorage.getItem('llmProvider') || 'openai';
         const previousOpenaiApiKey = localStorage.getItem('openaiApiKey') || '';
         const previousOpenaiBaseUrl = localStorage.getItem('openaiBaseUrl') || 'https://api.openai.com/v1';
-        const hasOpenaiConfigChanged = openaiApiKey.trim() !== previousOpenaiApiKey || openaiBaseUrl !== previousOpenaiBaseUrl;
+        const previousCustomModelName = localStorage.getItem('customModelName') || '';
         
-        // Save or clear OpenAI configuration in localStorage
-        if (openaiApiKey.trim()) {
-            localStorage.setItem('openaiApiKey', openaiApiKey);
-            localStorage.setItem('openaiBaseUrl', openaiBaseUrl);
-        } else {
-            // If the OpenAI API key is empty, remove it from localStorage
-            localStorage.removeItem('openaiApiKey');
-            localStorage.removeItem('openaiBaseUrl');
-        }
+        const hasConfigChanged = 
+            provider !== previousProvider ||
+            openaiApiKey.trim() !== previousOpenaiApiKey || 
+            openaiBaseUrl !== previousOpenaiBaseUrl ||
+            customModelName !== previousCustomModelName;
         
-        // Call configuration updated callback if OpenAI config has changed
-        if (hasOpenaiConfigChanged && onConfigurationUpdated) {
+        // Save configuration in localStorage
+        localStorage.setItem('llmProvider', provider);
+        localStorage.setItem('openaiApiKey', openaiApiKey);
+        localStorage.setItem('openaiBaseUrl', openaiBaseUrl);
+        localStorage.setItem('customModelName', customModelName);
+        
+        // Call configuration updated callback if config has changed
+        if (hasConfigChanged && onConfigurationUpdated) {
             onConfigurationUpdated();
         }
         
@@ -273,9 +299,8 @@ export function ApiKeyModal({ isOpen, onClose, onSave, initialApiKey = '', onCon
                 
                 {/* LLM Configuration */}
                 <CollapsibleCard 
-                    title={<h3 className="text-sm text-gray-900 dark:text-white font-medium">LLM Configuration (OpenAI / LMStudio / Custom)</h3>}
+                    title={<h3 className="text-sm text-gray-900 dark:text-white font-medium">LLM Configuration</h3>}
                     className='mb-4'
-                    defaultExpanded={true}
                 >
                     <div>
                         {/* API Key */}

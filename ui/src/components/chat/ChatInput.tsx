@@ -124,11 +124,27 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
     const loadModels = async () => {
         try {
             const result = await WorkflowChatAPI.listModels();
-            setModels(result.models);
+            let modelsToSet = [...result.models];
+            
+            // Add custom model if specified in localStorage
+            const customModelName = localStorage.getItem('customModelName');
+            if (customModelName && customModelName.trim()) {
+                // Check if custom model is not already in the list
+                const existingModel = modelsToSet.find(m => m.name === customModelName);
+                if (!existingModel) {
+                    modelsToSet.unshift({
+                        label: `🎯 ${customModelName}`,
+                        name: customModelName,
+                        image_enable: true
+                    });
+                }
+            }
+            
+            setModels(modelsToSet);
         } catch (error) {
             console.error('Failed to load models:', error);
             // Fallback to default models if API fails
-            setModels([{
+            let fallbackModels = [{
                 "label": "gemini-2.5-flash",
                 "name": "gemini-2.5-flash",
                 "image_enable": true
@@ -142,7 +158,19 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({
                 "label": "gpt-4.1",
                 "name": "gpt-4.1-2025-04-14-GlobalStandard",
                 "image_enable": true,
-            }]);
+            }];
+            
+            // Add custom model to fallback if specified
+            const customModelName = localStorage.getItem('customModelName');
+            if (customModelName && customModelName.trim()) {
+                fallbackModels.unshift({
+                    label: `🎯 ${customModelName}`,
+                    name: customModelName,
+                    image_enable: true
+                });
+            }
+            
+            setModels(fallbackModels);
         }
     };
 

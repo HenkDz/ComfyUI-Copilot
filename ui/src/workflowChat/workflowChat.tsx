@@ -176,7 +176,10 @@ export default function WorkflowChat({ onClose, visible = true, triggerUsage = f
     const [width, setWidth] = useState(window.innerWidth / 3);
     const [isResizing, setIsResizing] = useState(false);
     const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-    const [selectedModel, setSelectedModel] = useState<string>("gemini-2.5-flash");
+    const [selectedModel, setSelectedModel] = useState<string>(() => {
+        // Load saved model from localStorage, fallback to default
+        return localStorage.getItem('selectedLLMModel') || "gemini-2.5-flash";
+    });
     const [height, setHeight] = useState<number>(window.innerHeight);
     const [topPosition, setTopPosition] = useState<number>(0);
     // 添加公告状态
@@ -202,6 +205,11 @@ export default function WorkflowChat({ onClose, visible = true, triggerUsage = f
             updateMessagesCache(messages);
         }
     }, [messages, sessionId]);
+
+    // Save selected model to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('selectedLLMModel', selectedModel);
+    }, [selectedModel]);
 
     // useEffect(() => {
     //     if (messageDivRef.current) {
